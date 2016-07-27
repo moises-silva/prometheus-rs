@@ -1,0 +1,7 @@
+[package]
+name = "prometheus"
+version = "0.1.0"
+authors = ["Moises Silva <moises.silva@gmail.com>"]
+
+[dependencies]
+tiny_http = "0.5.2"
