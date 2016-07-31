@@ -1,4 +1,5 @@
 extern crate tiny_http;
+use std::thread;
 use tiny_http::{Server, Response};
 
 pub struct Counter {
@@ -16,12 +17,14 @@ impl Counter {
         }
     }
     pub fn increment(&mut self) -> i64 {
-        self.value + 1
+        self.value += 1 as i64;
+        self.value
     }
 }
 
 pub struct Registry<'a> {
     counters: Vec<&'a Counter>
+
 }
 
 impl<'a> Registry<'a> {
@@ -37,15 +40,18 @@ impl<'a> Registry<'a> {
 
     pub fn start(&mut self) {
         println!("Startings metrics http endpoint");
-        let server = Server::http("0.0.0.0:6780").unwrap();
-        loop {
-            let request = match server.recv() {
-                Ok(rq) => rq,
-                Err(e) => { println!("error: {}", e); break }
-            };
-            println!("Handling metrics request");
-            let response = Response::from_string("Prometheus Metrics".to_string());
-            let _ = request.respond(response);
-        }
+        let handle = thread::spawn(|| {
+            let server = Server::http("0.0.0.0:6780").unwrap();
+            loop {
+                let request = match server.recv() {
+                    Ok(rq) => rq,
+                    Err(e) => { println!("error: {}", e); break }
+                };
+                println!("Handling metrics request");
+                let response = Response::from_string("Prometheus Metrics".to_string());
+                let _ = request.respond(response);
+            }
+        });
+        //println!("Thread done: {}", handle.join().unwrap());
     }
 }
