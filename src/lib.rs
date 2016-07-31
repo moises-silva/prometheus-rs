@@ -8,33 +8,34 @@ pub struct Counter {
 }
 
 impl Counter {
+    pub fn new(name: String, desc: String) -> Counter {
+        Counter {
+            name: name,
+            desc: desc,
+            value: 0
+        }
+    }
     pub fn increment(&mut self) -> i64 {
         self.value + 1
     }
 }
 
-pub struct Registry {
-    counters: Vec<Counter>
+pub struct Registry<'a> {
+    counters: Vec<&'a Counter>
 }
 
-impl Registry {
-    pub fn new() -> Registry {
+impl<'a> Registry<'a> {
+    pub fn new() -> Registry<'a> {
         Registry {
             counters: Vec::new()
         }
     }
 
-    pub fn counter(&mut self, name: String, desc: String) -> &mut Counter {
-        let c = Counter {
-            name: name,
-            desc: desc,
-            value: 0
-        };
-        self.counters.push(c);
-        self.counters.last_mut().unwrap()
+    pub fn register(&mut self, counter: &'a Counter) {
+        self.counters.push(counter)
     }
 
-    pub fn start(&self) {
+    pub fn start(&mut self) {
         println!("Startings metrics http endpoint");
         let server = Server::http("0.0.0.0:6780").unwrap();
         loop {
@@ -48,4 +49,3 @@ impl Registry {
         }
     }
 }
-
