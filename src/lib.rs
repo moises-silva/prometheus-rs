@@ -36,12 +36,16 @@ impl fmt::Debug for Counter {
 }
 
 pub struct Registry {
+    address: String,
+    port: u16,
     counters: Vec<Weak<Mutex<Counter>>>
 }
 
 impl Registry {
-    pub fn new() -> Registry {
+    pub fn new(address: String, port: u16) -> Registry {
         Registry {
+            address: address,
+            port: port,
             counters: Vec::new()
         }
     }
@@ -51,9 +55,10 @@ impl Registry {
     }
 
     pub fn start(&mut self) {
-        println!("Startings metrics http endpoint");
-        let handle = thread::spawn(|| {
-            let server = Server::http("0.0.0.0:6780").unwrap();
+        let bindaddr = format!("{}:{}", self.address, self.port);
+        println!("Startings metrics http endpoint at addr {}", bindaddr);
+        let handle = thread::spawn(move || {
+            let server = Server::http(bindaddr.as_str()).unwrap();
             loop {
                 let request = match server.recv() {
                     Ok(rq) => rq,
