@@ -1,6 +1,6 @@
 extern crate tiny_http;
 use std::thread;
-use std::sync::{Weak, Mutex};
+use std::sync::{Arc, Mutex};
 use std::fmt;
 use tiny_http::{Server, Response};
 
@@ -27,6 +27,14 @@ impl Counter {
     pub fn value(&self) -> i64 {
         self.value
     }
+
+    pub fn desc(&self) -> String {
+        self.desc.clone()
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
 }
 
 impl fmt::Debug for Counter {
@@ -38,7 +46,7 @@ impl fmt::Debug for Counter {
 pub struct Registry {
     address: String,
     port: u16,
-    counters: Vec<Weak<Mutex<Counter>>>
+    counters: Vec<Arc<Mutex<Counter>>>
 }
 
 impl Registry {
@@ -50,21 +58,41 @@ impl Registry {
         }
     }
 
-    pub fn register(&mut self, counter: Weak<Mutex<Counter>>) {
+    pub fn register(&mut self, counter: Arc<Mutex<Counter>>) {
         self.counters.push(counter)
     }
 
-    pub fn start(&mut self) {
-        let bindaddr = format!("{}:{}", self.address, self.port);
+    pub fn address(&self) -> String {
+        self.address.clone()
+    }
+
+    pub fn port(&self) -> u16 {
+        self.port
+    }
+
+    pub fn start(registry: &Arc<Mutex<Registry>>) {
+        let bindaddr;
+        {
+            let reg = registry.lock().unwrap();
+            bindaddr = format!("{}:{}", reg.address(), reg.port());
+        }
         println!("Startings metrics http endpoint at addr {}", bindaddr);
-        let handle = thread::spawn(move || {
+        let regref = registry.clone();
+        thread::spawn(move || {
             let server = Server::http(bindaddr.as_str()).unwrap();
             loop {
                 let request = match server.recv() {
                     Ok(rq) => rq,
                     Err(e) => { println!("error: {}", e); break }
                 };
-                println!("Handling metrics request");
+                {
+                    let reg = regref.lock().unwrap();
+                    println!("Handling metrics request");
+                    for rc in &reg.counters {
+                        let counter = rc.lock().unwrap();
+                        println!("{} {} ({})", counter.name(), counter.value(), counter.desc());
+                    }
+                }
                 let response = Response::from_string("Prometheus Metrics".to_string());
                 let _ = request.respond(response);
             }
