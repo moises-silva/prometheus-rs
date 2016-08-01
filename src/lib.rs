@@ -1,5 +1,7 @@
 extern crate tiny_http;
 use std::thread;
+use std::sync::{Weak, Mutex};
+use std::fmt;
 use tiny_http::{Server, Response};
 
 pub struct Counter {
@@ -16,25 +18,35 @@ impl Counter {
             value: 0
         }
     }
+
     pub fn increment(&mut self) -> i64 {
         self.value += 1 as i64;
+        self.value()
+    }
+
+    pub fn value(&self) -> i64 {
         self.value
     }
 }
 
-pub struct Registry<'a> {
-    counters: Vec<&'a Counter>
-
+impl fmt::Debug for Counter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Counter {{ name: {}, value: {}}}", self.name, self.value)
+    }
 }
 
-impl<'a> Registry<'a> {
-    pub fn new() -> Registry<'a> {
+pub struct Registry {
+    counters: Vec<Weak<Mutex<Counter>>>
+}
+
+impl Registry {
+    pub fn new() -> Registry {
         Registry {
             counters: Vec::new()
         }
     }
 
-    pub fn register(&mut self, counter: &'a Counter) {
+    pub fn register(&mut self, counter: Weak<Mutex<Counter>>) {
         self.counters.push(counter)
     }
 
