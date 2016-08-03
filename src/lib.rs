@@ -24,6 +24,11 @@ impl Counter {
         self.value()
     }
 
+    pub fn increment_by(&mut self, val: i64) -> i64 {
+        self.value += val;
+        self.value()
+    }
+
     pub fn value(&self) -> i64 {
         self.value
     }
