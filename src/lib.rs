@@ -37,6 +37,16 @@ impl Counter {
         self.value()
     }
 
+    pub fn decrement(&mut self) -> i64 {
+        self.value -= 1 as i64;
+        self.value()
+    }
+
+    pub fn decrement_by(&mut self, val: i64) -> i64 {
+        self.value -= val;
+        self.value()
+    }
+
     pub fn value(&self) -> i64 {
         self.value
     }
