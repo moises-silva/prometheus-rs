@@ -1,13 +1,21 @@
 extern crate tiny_http;
+use std::ops::Deref;
 use std::thread;
 use std::sync::{Arc, Mutex};
-use std::fmt;
 use tiny_http::{Server, Response};
 
+#[derive(Debug)]
 pub struct Counter {
     name: String,
     desc: String,
     value: i64
+}
+
+#[derive(Debug)]
+pub struct Gauge {
+    name: String,
+    desc: String,
+    value: f64
 }
 
 impl Counter {
@@ -42,16 +50,38 @@ impl Counter {
     }
 }
 
-impl fmt::Debug for Counter {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Counter {{ name: {}, value: {}}}", self.name, self.value)
+impl Gauge {
+    pub fn new(name: String, desc: String) -> Gauge {
+        Gauge {
+            name: name,
+            desc: desc,
+            value: 0.0
+        }
+    }
+
+    pub fn set(&mut self, val: f64) -> f64 {
+        self.value = val;
+        self.value()
+    }
+
+    pub fn value(&self) -> f64 {
+        self.value
+    }
+
+    pub fn desc(&self) -> String {
+        self.desc.clone()
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone()
     }
 }
 
 pub struct Registry {
     address: String,
     port: u16,
-    counters: Vec<Arc<Mutex<Counter>>>
+    counters: Vec<Arc<Mutex<Counter>>>,
+    gauges: Vec<Arc<Mutex<Gauge>>>
 }
 
 impl Registry {
@@ -59,12 +89,17 @@ impl Registry {
         Registry {
             address: address,
             port: port,
-            counters: Vec::new()
+            counters: Vec::new(),
+            gauges: Vec::new()
         }
     }
 
-    pub fn register(&mut self, counter: Arc<Mutex<Counter>>) {
+    pub fn register_counter(&mut self, counter: Arc<Mutex<Counter>>) {
         self.counters.push(counter)
+    }
+
+    pub fn register_gauge(&mut self, gauge: Arc<Mutex<Gauge>>) {
+        self.gauges.push(gauge)
     }
 
     pub fn address(&self) -> String {
@@ -95,7 +130,11 @@ impl Registry {
                     println!("Handling metrics request");
                     for rc in &reg.counters {
                         let counter = rc.lock().unwrap();
-                        println!("{} {} ({})", counter.name(), counter.value(), counter.desc());
+                        println!("{:?}", counter.deref());
+                    }
+                    for rc in &reg.gauges {
+                        let gauge = rc.lock().unwrap();
+                        println!("{:?}", gauge.deref());
                     }
                 }
                 let response = Response::from_string("Prometheus Metrics".to_string());

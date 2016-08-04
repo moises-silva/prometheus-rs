@@ -5,3 +5,4 @@ authors = ["Moises Silva <moises.silva@gmail.com>"]
 
 [dependencies]
 tiny_http = "0.5.2"
+sys-info = "0.4.1"
