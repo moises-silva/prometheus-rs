@@ -1,3 +1,9 @@
+// TODO:
+// - Add tags to metrics
+// - Hide Arc/Mutex?
+#[macro_use]
+extern crate log;
+
 extern crate tiny_http;
 use std::ops::Deref;
 use std::thread;
@@ -126,31 +132,30 @@ impl Registry {
             let reg = registry.lock().unwrap();
             bindaddr = format!("{}:{}", reg.address(), reg.port());
         }
-        println!("Startings metrics http endpoint at addr {}", bindaddr);
+        info!("Startings metrics http endpoint at addr {}", bindaddr);
         let regref = registry.clone();
         thread::spawn(move || {
             let server = Server::http(bindaddr.as_str()).unwrap();
             loop {
                 let request = match server.recv() {
                     Ok(rq) => rq,
-                    Err(e) => { println!("error: {}", e); break }
+                    Err(e) => { error!("error: {}", e); break }
                 };
                 {
                     let reg = regref.lock().unwrap();
-                    println!("Handling metrics request");
+                    debug!("Handling metrics request");
                     for rc in &reg.counters {
                         let counter = rc.lock().unwrap();
-                        println!("{:?}", counter.deref());
+                        debug!("{:?}", counter.deref());
                     }
                     for rc in &reg.gauges {
                         let gauge = rc.lock().unwrap();
-                        println!("{:?}", gauge.deref());
+                        debug!("{:?}", gauge.deref());
                     }
                 }
                 let response = Response::from_string("Prometheus Metrics".to_string());
                 let _ = request.respond(response);
             }
         });
-        //println!("Thread done: {}", handle.join().unwrap());
     }
 }

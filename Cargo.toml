@@ -6,3 +6,7 @@ authors = ["Moises Silva <moises.silva@gmail.com>"]
 [dependencies]
 tiny_http = "0.5.2"
 sys-info = "0.4.1"
+log = "*"
+slog = "0.7.0"
+slog-term = "0.7.0"
+slog-stdlog = "0.7.0"
