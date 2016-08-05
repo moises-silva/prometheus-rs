@@ -14,7 +14,7 @@ use tiny_http::{Server, Response};
 pub struct Counter {
     name: String,
     desc: String,
-    value: i64
+    value: f64
 }
 
 #[derive(Debug)]
@@ -29,31 +29,21 @@ impl Counter {
         Counter {
             name: name,
             desc: desc,
-            value: 0
+            value: 0.0
         }
     }
 
-    pub fn increment(&mut self) -> i64 {
-        self.value += 1 as i64;
+    pub fn increment(&mut self) -> f64 {
+        self.value += 1 as f64;
         self.value()
     }
 
-    pub fn increment_by(&mut self, val: i64) -> i64 {
+    pub fn increment_by(&mut self, val: f64) -> f64 {
         self.value += val;
         self.value()
     }
 
-    pub fn decrement(&mut self) -> i64 {
-        self.value -= 1 as i64;
-        self.value()
-    }
-
-    pub fn decrement_by(&mut self, val: i64) -> i64 {
-        self.value -= val;
-        self.value()
-    }
-
-    pub fn value(&self) -> i64 {
+    pub fn value(&self) -> f64 {
         self.value
     }
 
@@ -77,6 +67,26 @@ impl Gauge {
 
     pub fn set(&mut self, val: f64) -> f64 {
         self.value = val;
+        self.value()
+    }
+
+    pub fn increment(&mut self) -> f64 {
+        self.value += 1 as f64;
+        self.value()
+    }
+
+    pub fn increment_by(&mut self, val: f64) -> f64 {
+        self.value += val;
+        self.value()
+    }
+
+    pub fn decrement(&mut self) -> f64 {
+        self.value -= 1 as f64;
+        self.value()
+    }
+
+    pub fn decrement_by(&mut self, val: f64) -> f64 {
+        self.value -= val;
         self.value()
     }
 
