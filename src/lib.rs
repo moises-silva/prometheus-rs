@@ -1,6 +1,9 @@
 // TODO:
 // - Add tags to metrics
 // - Hide Arc/Mutex?
+// - Validate request Accept header (should be compatible with what we support)
+// - Validate endpoint /metrics?
+// - Extend tiny http to allow getting headers by name
 #[macro_use]
 extern crate log;
 
@@ -153,13 +156,14 @@ impl Registry {
                     Ok(rq) => rq,
                     Err(e) => { error!("error: {}", e); break }
                 };
+                debug!("Handling metrics request (method={:?}, url: {:?}, headers: {:?})",
+                       request.method(), request.url(), request.headers());
+                let time = time::now().to_timespec();
+                let msnow = (time.sec * 1000) + (time.nsec as i64 / 1000000);
+                let mut payload = String::new();
+                // Locked
                 {
                     let reg = regref.lock().unwrap();
-                    debug!("Handling metrics request (method={:?}, url: {:?}, headers: {:?})",
-                           request.method(), request.url(), request.headers());
-                    let time = time::now().to_timespec();
-                    let msnow = (time.sec * 1000) + (time.nsec as i64 / 1000000);
-                    let mut payload = String::new();
                     for rc in &reg.counters {
                         let counter = rc.lock().unwrap();
                         debug!("{:?}", counter.deref());
