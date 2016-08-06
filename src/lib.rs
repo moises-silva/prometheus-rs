@@ -5,6 +5,7 @@
 extern crate log;
 
 extern crate tiny_http;
+extern crate time;
 use std::ops::Deref;
 use std::thread;
 use std::sync::{Arc, Mutex};
@@ -154,17 +155,26 @@ impl Registry {
                 {
                     let reg = regref.lock().unwrap();
                     debug!("Handling metrics request");
+                    let time = time::now().to_timespec();
+                    let msnow = (time.sec * 1000) + (time.nsec as i64 / 1000000);
+                    let mut payload = String::new();
                     for rc in &reg.counters {
                         let counter = rc.lock().unwrap();
                         debug!("{:?}", counter.deref());
+                        payload.push_str(&format!("# HELP {} {}\n", counter.name(), counter.desc()));
+                        payload.push_str(&format!("{} {} {}\n", counter.name(), counter.value(), msnow));
                     }
                     for rc in &reg.gauges {
                         let gauge = rc.lock().unwrap();
                         debug!("{:?}", gauge.deref());
+                        payload.push_str(&format!("# HELP {} {}\n", gauge.name(), gauge.desc()));
+                        payload.push_str(&format!("{} {} {}\n", gauge.name(), gauge.value(), msnow));
                     }
+                    payload.push('\n');
+                    error!("{}", payload);
+                    let response = Response::from_string("Prometheus Metrics".to_string());
+                    let _ = request.respond(response);
                 }
-                let response = Response::from_string("Prometheus Metrics".to_string());
-                let _ = request.respond(response);
             }
         });
     }
