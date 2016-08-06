@@ -157,7 +157,7 @@ impl Registry {
         self.port
     }
 
-    pub fn handle_request(request: Request, regref: &Arc<Mutex<Registry>>) {
+    fn handle_request(request: Request, regref: &Arc<Mutex<Registry>>) {
         debug!("Handling metrics request (method={:?}, url: {:?}, headers: {:?})",
                request.method(), request.url(), request.headers());
         let time = time::now().to_timespec();
@@ -195,12 +195,17 @@ impl Registry {
         info!("Startings metrics http endpoint at addr {}", bindaddr);
         let regref = registry.clone();
         let thread = thread::spawn(move || {
+            let timeout = Duration::from_millis(100);
             let server = Server::http(bindaddr.as_str()).unwrap();
             loop {
-                match server.recv() {
-                    Ok(rq) => Registry::handle_request(rq, &regref),
+                match server.try_recv_timeout(timeout) {
+                    Ok(res) => {
+                        if let Some(rq) = res {
+                            Registry::handle_request(rq, &regref);
+                        }
+                    }
                     Err(e) => { error!("error: {}", e); break }
-                };
+                }
                 {
                     let mut reg = regref.lock().unwrap();
                     if reg.stop {
@@ -208,7 +213,6 @@ impl Registry {
                         reg.running = false;
                         break;
                     }
-                    info!("Still alive and kicking!");
                 }
             }
         });
