@@ -30,18 +30,17 @@ fn main() {
         regl.register_counter(counter_arc.clone());
         regl.register_gauge(gauge_arc.clone());
     }
-    //let interval = Duration::from_millis(500);
-    let interval = Duration::from_millis(30000);
+    let interval = Duration::from_millis(100);
     prometheus::Registry::start(&reg_arc);
     let counter_mutex = counter_arc.clone();
     let gauge_mutex = gauge_arc.clone();
     info!("Starting loop");
-    {
+    for _ in 0..100 {
         counter_mutex.lock().unwrap().increment();
         let load = loadavg().unwrap();
         gauge_mutex.lock().unwrap().set(load.one);
-        prometheus::Registry::stop(reg_arc);
         thread::sleep(interval);
     }
     debug!("Terminating!");
+    prometheus::Registry::stop(reg_arc);
 }

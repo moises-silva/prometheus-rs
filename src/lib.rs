@@ -13,6 +13,7 @@ extern crate tiny_http;
 extern crate time;
 use std::str::FromStr;
 use std::ops::Deref;
+use std::time::Duration;
 use std::thread;
 use std::thread::{JoinHandle};
 use std::sync::{Arc, Mutex};
@@ -200,15 +201,20 @@ impl Registry {
                     Ok(rq) => Registry::handle_request(rq, &regref),
                     Err(e) => { error!("error: {}", e); break }
                 };
-                if regref.lock().unwrap().stop {
-                    info!("Stopping registry");
-                    break;
+                {
+                    let mut reg = regref.lock().unwrap();
+                    if reg.stop {
+                        info!("Stopping registry");
+                        reg.running = false;
+                        break;
+                    }
+                    info!("Still alive and kicking!");
                 }
-                info!("Still alive and kicking!");
             }
         });
         {
             let mut reg = registry.lock().unwrap();
+            reg.running = true;
             reg.thread = Some(thread);
         }
     }
@@ -217,13 +223,18 @@ impl Registry {
         // TODO: This is ugly as fuck, find correct way of doing it
         // Stop the thread and join it
         registry.lock().unwrap().stop = true;
+        let interval = Duration::from_millis(100);
         // Locked
         loop {
             {
-                let reg = registry.lock().unwrap();
+                debug!("Looping");
+                thread::sleep(interval);
+                let mut reg = registry.lock().unwrap();
                 if !reg.running {
                     if reg.thread.is_some() {
-                        reg.thread.unwrap().join();
+                        let mut t = None;
+                        std::mem::swap(&mut reg.thread, &mut t);
+                        let _ = t.unwrap().join();
                     }
                     break;
                 }
