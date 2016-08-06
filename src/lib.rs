@@ -6,10 +6,11 @@ extern crate log;
 
 extern crate tiny_http;
 extern crate time;
+use std::str::FromStr;
 use std::ops::Deref;
 use std::thread;
 use std::sync::{Arc, Mutex};
-use tiny_http::{Server, Response};
+use tiny_http::{Server, Response, Header, StatusCode};
 
 #[derive(Debug)]
 pub struct Counter {
@@ -154,7 +155,8 @@ impl Registry {
                 };
                 {
                     let reg = regref.lock().unwrap();
-                    debug!("Handling metrics request");
+                    debug!("Handling metrics request (method={:?}, url: {:?}, headers: {:?})",
+                           request.method(), request.url(), request.headers());
                     let time = time::now().to_timespec();
                     let msnow = (time.sec * 1000) + (time.nsec as i64 / 1000000);
                     let mut payload = String::new();
@@ -171,9 +173,10 @@ impl Registry {
                         payload.push_str(&format!("{} {} {}\n", gauge.name(), gauge.value(), msnow));
                     }
                     payload.push('\n');
-                    error!("{}", payload);
-                    let response = Response::from_string("Prometheus Metrics".to_string());
-                    let _ = request.respond(response);
+                    debug!("{}", payload);
+                    let headers = vec![Header::from_str("Content-Type: text/plain; version=0.0.4").unwrap()];
+                    let rsp = Response::new(StatusCode::from(200), headers, payload.as_bytes(), Some(payload.len()), None);
+                    let _ = request.respond(rsp);
                 }
             }
         });
