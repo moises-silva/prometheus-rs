@@ -4,6 +4,8 @@
 // - Validate request Accept header (should be compatible with what we support)
 // - Validate endpoint /metrics?
 // - Extend tiny http to allow getting headers by name
+// - The whole registry/metric locking thing is messed up, works and is safe afaict
+//   but needs to be reworked to make it pretty and simple
 #[macro_use]
 extern crate log;
 
@@ -12,8 +14,9 @@ extern crate time;
 use std::str::FromStr;
 use std::ops::Deref;
 use std::thread;
+use std::thread::{JoinHandle};
 use std::sync::{Arc, Mutex};
-use tiny_http::{Server, Response, Header, StatusCode};
+use tiny_http::{Server, Request, Response, Header, StatusCode};
 
 #[derive(Debug)]
 pub struct Counter {
@@ -109,10 +112,19 @@ impl Gauge {
 }
 
 pub struct Registry {
+    // HTTP listening address
     address: String,
     port: u16,
+    // Counter metrics
     counters: Vec<Arc<Mutex<Counter>>>,
-    gauges: Vec<Arc<Mutex<Gauge>>>
+    // Gauge metrics
+    gauges: Vec<Arc<Mutex<Gauge>>>,
+    // Request to stop the registry
+    stop: bool,
+    // Set to true when the registry is running
+    running: bool,
+    // The runner thread
+    thread: Option<JoinHandle<()>>
 }
 
 impl Registry {
@@ -121,7 +133,10 @@ impl Registry {
             address: address,
             port: port,
             counters: Vec::new(),
-            gauges: Vec::new()
+            gauges: Vec::new(),
+            stop: false,
+            running: false,
+            thread: None
         }
     }
 
@@ -141,6 +156,35 @@ impl Registry {
         self.port
     }
 
+    pub fn handle_request(request: Request, regref: &Arc<Mutex<Registry>>) {
+        debug!("Handling metrics request (method={:?}, url: {:?}, headers: {:?})",
+               request.method(), request.url(), request.headers());
+        let time = time::now().to_timespec();
+        let msnow = (time.sec * 1000) + (time.nsec as i64 / 1000000);
+        let mut payload = String::new();
+        // Locked
+        {
+            let reg = regref.lock().unwrap();
+            for rc in &reg.counters {
+                let counter = rc.lock().unwrap();
+                debug!("{:?}", counter.deref());
+                payload.push_str(&format!("# HELP {} {}\n", counter.name(), counter.desc()));
+                payload.push_str(&format!("{} {} {}\n", counter.name(), counter.value(), msnow));
+            }
+            for rc in &reg.gauges {
+                let gauge = rc.lock().unwrap();
+                debug!("{:?}", gauge.deref());
+                payload.push_str(&format!("# HELP {} {}\n", gauge.name(), gauge.desc()));
+                payload.push_str(&format!("{} {} {}\n", gauge.name(), gauge.value(), msnow));
+            }
+            payload.push('\n');
+            debug!("{}", payload);
+            let headers = vec![Header::from_str("Content-Type: text/plain; version=0.0.4").unwrap()];
+            let rsp = Response::new(StatusCode::from(200), headers, payload.as_bytes(), Some(payload.len()), None);
+            let _ = request.respond(rsp);
+        }
+    }
+
     pub fn start(registry: &Arc<Mutex<Registry>>) {
         let bindaddr;
         {
@@ -149,40 +193,41 @@ impl Registry {
         }
         info!("Startings metrics http endpoint at addr {}", bindaddr);
         let regref = registry.clone();
-        thread::spawn(move || {
+        let thread = thread::spawn(move || {
             let server = Server::http(bindaddr.as_str()).unwrap();
             loop {
-                let request = match server.recv() {
-                    Ok(rq) => rq,
+                match server.recv() {
+                    Ok(rq) => Registry::handle_request(rq, &regref),
                     Err(e) => { error!("error: {}", e); break }
                 };
-                debug!("Handling metrics request (method={:?}, url: {:?}, headers: {:?})",
-                       request.method(), request.url(), request.headers());
-                let time = time::now().to_timespec();
-                let msnow = (time.sec * 1000) + (time.nsec as i64 / 1000000);
-                let mut payload = String::new();
-                // Locked
-                {
-                    let reg = regref.lock().unwrap();
-                    for rc in &reg.counters {
-                        let counter = rc.lock().unwrap();
-                        debug!("{:?}", counter.deref());
-                        payload.push_str(&format!("# HELP {} {}\n", counter.name(), counter.desc()));
-                        payload.push_str(&format!("{} {} {}\n", counter.name(), counter.value(), msnow));
-                    }
-                    for rc in &reg.gauges {
-                        let gauge = rc.lock().unwrap();
-                        debug!("{:?}", gauge.deref());
-                        payload.push_str(&format!("# HELP {} {}\n", gauge.name(), gauge.desc()));
-                        payload.push_str(&format!("{} {} {}\n", gauge.name(), gauge.value(), msnow));
-                    }
-                    payload.push('\n');
-                    debug!("{}", payload);
-                    let headers = vec![Header::from_str("Content-Type: text/plain; version=0.0.4").unwrap()];
-                    let rsp = Response::new(StatusCode::from(200), headers, payload.as_bytes(), Some(payload.len()), None);
-                    let _ = request.respond(rsp);
+                if regref.lock().unwrap().stop {
+                    info!("Stopping registry");
+                    break;
                 }
+                info!("Still alive and kicking!");
             }
         });
+        {
+            let mut reg = registry.lock().unwrap();
+            reg.thread = Some(thread);
+        }
+    }
+
+    pub fn stop(registry: Arc<Mutex<Registry>>) {
+        // TODO: This is ugly as fuck, find correct way of doing it
+        // Stop the thread and join it
+        registry.lock().unwrap().stop = true;
+        // Locked
+        loop {
+            {
+                let reg = registry.lock().unwrap();
+                if !reg.running {
+                    if reg.thread.is_some() {
+                        reg.thread.unwrap().join();
+                    }
+                    break;
+                }
+            }
+        }
     }
 }
