@@ -223,7 +223,7 @@ impl Registry {
         }
     }
 
-    pub fn stop(registry: Arc<Mutex<Registry>>) {
+    pub fn stop(registry: &Arc<Mutex<Registry>>) {
         // TODO: This is ugly as fuck, find correct way of doing it
         // Stop the thread and join it
         registry.lock().unwrap().stop = true;

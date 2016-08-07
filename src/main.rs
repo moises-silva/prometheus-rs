@@ -42,5 +42,5 @@ fn main() {
         thread::sleep(interval);
     }
     debug!("Terminating!");
-    prometheus::Registry::stop(reg_arc);
+    prometheus::Registry::stop(&reg_arc);
 }
