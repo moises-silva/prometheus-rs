@@ -160,7 +160,7 @@ impl Registry {
     fn handle_request(request: Request, regref: &Arc<Mutex<Registry>>) {
         debug!("Handling metrics request (method={:?}, url: {:?}, headers: {:?})",
                request.method(), request.url(), request.headers());
-        let time = time::now().to_timespec();
+        let time = time::get_time();
         let msnow = (time.sec * 1000) + (time.nsec as i64 / 1000000);
         let mut payload = String::new();
         // Locked
@@ -198,7 +198,7 @@ impl Registry {
             let timeout = Duration::from_millis(100);
             let server = Server::http(bindaddr.as_str()).unwrap();
             loop {
-                match server.try_recv_timeout(timeout) {
+                match server.recv_timeout(timeout) {
                     Ok(res) => {
                         if let Some(rq) = res {
                             Registry::handle_request(rq, &regref);
