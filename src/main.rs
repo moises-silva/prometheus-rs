@@ -16,7 +16,7 @@ use sys_info::loadavg;
 
 use slog::drain::IntoLogger;
 
-fn main() {
+fn run() {
     let root = slog_term::stderr().into_logger(o!());
     slog_stdlog::set_logger(root).unwrap();
 
@@ -43,4 +43,10 @@ fn main() {
     }
     debug!("Terminating!");
     prometheus::Registry::stop(&reg_arc);
+}
+
+fn main() {
+    run();
+    debug!("Socket should be closed now");
+    thread::sleep(Duration::from_millis(60000));
 }
