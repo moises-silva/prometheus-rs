@@ -4,10 +4,7 @@ version = "0.1.0"
 authors = ["Moises Silva <moises.silva@gmail.com>"]
 
 [dependencies]
-# Use custom tiny-http until PR 116 is merged
-# https://github.com/frewsxcv/tiny-http/pull/116
-# tiny_http = "0.5.2"
-tiny_http = { git = "https://github.com/moises-silva/tiny-http.git", rev = "feature/recv-with-timeout" }
+tiny_http = "0.5.5"
 sys-info = "0.4.1"
 time = "0.1.35"
 log = "*"
